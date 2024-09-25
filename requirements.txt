@@ -1,0 +1,10 @@
+streamlit
+tqdm
+spacy
+chromadb
+sentence-transformers
+pandas
+numpy
+python-dotenv
+PyMuPDF
+groq
