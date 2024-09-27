@@ -9,9 +9,9 @@ def text_formatter(text: str) -> str:
     return text.replace("\n", " ").strip()
 
 
-def read_pdf(pdf_file) -> list[dict]:
+def read_pdf(pdf_bytes: bytes) -> list[dict]:
     """Reads a PDF file and extracts text, word, and sentence counts per page."""
-    doc = fitz.open(stream=pdf_file.read(), filetype="pdf")
+    doc = fitz.open(stream=pdf_bytes, filetype="pdf")  # Use pdf_bytes directly
     pages_and_text = []
     for page_number, page in tqdm(enumerate(doc), desc="Reading PDF"):
         text = page.get_text()

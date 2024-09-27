@@ -7,9 +7,11 @@ from dotenv import load_dotenv
 import datetime
 import uuid  # Added for generating document IDs
 from chroma_setup import initialize_client  # Adjust the import to your module name
+import numpy as np
 
 # Load environment variables from the .env file
 load_dotenv()
+
 
 # HuggingFace embedding model setup
 def get_embedding_model():
@@ -18,59 +20,86 @@ def get_embedding_model():
         model_name="sentence-transformers/all-MiniLM-L6-v2",
     )
 
+
 def embed_text_chunks(pages_and_chunks: list[dict]) -> pd.DataFrame:
     embedding_model = get_embedding_model()
 
-    # Embed each chunk
     for item in pages_and_chunks:
-        # Ensure the embedding is in 1D (flatten if necessary)
+        # Generate the embedding for the sentence chunk
         embedding = embedding_model(input=item["sentence_chunk"])
 
-        # If embedding is returned as a batch, take the first element
-        if isinstance(embedding, list) and isinstance(embedding[0], list):
-            embedding = embedding[0]
+        # If embedding is a nested list, flatten it
+        if isinstance(embedding, list):
+            # Flatten the nested list
+            embedding = [float(val) for sublist in embedding for val in sublist]
+        else:
+            raise ValueError(f"Unexpected embedding format: {type(embedding)}")
 
-        # Store the flattened embedding back in the dictionary
+        # Store the embedding back in the dictionary
         item["embedding"] = embedding
 
-    # Convert to DataFrame
+    # Convert the processed data to a DataFrame
     df = pd.DataFrame(pages_and_chunks)
     return df
 
+
 def save_to_chroma_db(embeddings_df: pd.DataFrame, user_id: str, document_id: str):
-    # Use a shared collection for all documents
-    collection_name = "text_embeddings"
-
     client = initialize_client()
-    collection = client.get_or_create_collection(name=collection_name)
+    collection = client.get_or_create_collection(name=f"text_embeddings_{user_id}")
 
-    ids = [f"{user_id}_{document_id}_{i}" for i in range(len(embeddings_df))]
+    combined_key = f"{user_id}_{document_id}"
+
+    ids = [f"{combined_key}_{i}" for i in range(len(embeddings_df))]
     documents = embeddings_df["sentence_chunk"].tolist()
-    embeddings = embeddings_df["embedding"].tolist()
-    
-    # Add metadata for filtering (user_id and document_id)
-    metadatas = [{"user_id": user_id, "document_id": document_id} for _ in range(len(embeddings_df))]
 
-    collection.add(documents=documents, embeddings=embeddings, ids=ids, metadatas=metadatas)
+    # Convert all embeddings to a flat list of floats
+    embeddings = []
+    for embedding in embeddings_df["embedding"]:
+        # If embedding is a NumPy array, convert it to a flat list
+        if isinstance(embedding, np.ndarray):
+            embeddings.append(embedding.flatten().tolist())
+        else:
+            embeddings.append(embedding)  # In case it is already a list of floats
+
+    # Log the combined key and metadata being stored
+    metadatas = [{"combined_key": combined_key} for _ in range(len(embeddings_df))]
+    print(f"Storing documents with combined_key: {combined_key}")
+
+    collection.add(
+        documents=documents, embeddings=embeddings, ids=ids, metadatas=metadatas
+    )
+
 
 def query_chroma_db(user_id: str, document_id: str, query: str):
-    collection_name = "text_embeddings"
     client = initialize_client()
-    collection = client.get_collection(name=collection_name)
+    collection = client.get_collection(name=f"text_embeddings_{user_id}")
 
-    # Query the collection using metadata with an $and operator for multiple conditions
+    combined_key = f"{user_id}_{document_id}"
+
+    # Log combined key
+    print(f"Querying with combined_key: {combined_key}")
+
+    # Query the collection based on the combined key
     results = collection.query(
         query_texts=[query],
         n_results=5,
-        where={"$and": [{"user_id": user_id}, {"document_id": document_id}]}  # Use $and operator to filter by both user and document
+        where={
+            "combined_key": combined_key
+        },  # Filter based on the combined metadata key
     )
-    
-    # Extract the document snippets
-    documents = results["documents"]
-    relevant_docs = [doc for sublist in documents for doc in sublist]  # Flatten the list
 
-    # Combine relevant document excerpts into a single string
-    context = "\n\n".join(relevant_docs)
+    # Log the raw results
+    print(f"Query Results: {results}")
+
+    # Extract the document snippets
+    documents = results.get("documents", [])
+    if documents:
+        relevant_docs = [
+            doc for sublist in documents for doc in sublist
+        ]  # Flatten the list
+        context = "\n\n".join(relevant_docs)
+    else:
+        context = "No documents found"
 
     return context
 

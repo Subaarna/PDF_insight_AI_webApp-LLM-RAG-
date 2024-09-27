@@ -8,3 +8,6 @@ numpy
 python-dotenv
 PyMuPDF
 groq
+pdf2image
+Pillow
+streamlit-pdf-viewer
