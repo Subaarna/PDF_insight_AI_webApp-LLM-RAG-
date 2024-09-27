@@ -48,7 +48,8 @@ To get started with PDF Assistant, follow these steps:
 1. **Upload a PDF:** Click on the "Upload a PDF" button to select and upload your document.
 2. **Interact with the Document:** Once the PDF is processed, ask questions in the chat input to retrieve information.
 3. **View Chat History:** Check your previous interactions in the chat history section.
-![Screenshot 2024-09-25 234536](https://github.com/user-attachments/assets/fd45afb7-537f-4931-b87e-14ec005532c9)
-![Screenshot 2024-09-25 195229](https://github.com/user-attachments/assets/4b4e6a47-5c15-4a47-a6fd-21a412111cba)
-![Screenshot 2024-09-25 195145](https://github.com/user-attachments/assets/5c2898fc-3d91-4828-bbe1-bad8949b7ace)
 
+
+![Screenshot 2024-09-25 195145](https://github.com/user-attachments/assets/5c2898fc-3d91-4828-bbe1-bad8949b7ace)
+![Screenshot 2024-09-25 195229](https://github.com/user-attachments/assets/4b4e6a47-5c15-4a47-a6fd-21a412111cba)
+![Screenshot 2024-09-25 234536](https://github.com/user-attachments/assets/fd45afb7-537f-4931-b87e-14ec005532c9)
