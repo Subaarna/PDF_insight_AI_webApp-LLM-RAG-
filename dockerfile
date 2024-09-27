@@ -1,8 +1,14 @@
-# Base image with Python 3.9
+# Base image with Python 3.10
 FROM python:3.10.14
 
 # Set working directory
 WORKDIR /app
+
+# Install system dependencies (including Poppler)
+RUN apt-get update && \
+    apt-get install -y poppler-utils && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
 # Copy requirements.txt first to leverage Docker cache
 COPY requirements.txt .
