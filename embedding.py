@@ -6,7 +6,7 @@ import os
 from dotenv import load_dotenv
 import datetime
 import uuid  # Added for generating document IDs
-from chroma_setup import initialize_client  # Adjust the import to your module name
+from chroma_setup import initialize_client  
 import numpy as np
 
 # Load environment variables from the .env file
