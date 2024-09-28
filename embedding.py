@@ -1,3 +1,7 @@
+import time
+import requests
+from requests.exceptions import ReadTimeout, HTTPError
+import logging
 import json
 import pandas as pd
 import chromadb
@@ -5,12 +9,9 @@ from chromadb.utils import embedding_functions
 import os
 from dotenv import load_dotenv
 import datetime
-import uuid  # Added for generating document IDs
-from chroma_setup import initialize_client  # Adjust the import to your module name
+import uuid
+from chroma_setup import initialize_client
 import numpy as np
-
-# Load environment variables from the .env file
-load_dotenv()
 
 
 # HuggingFace embedding model setup
@@ -21,22 +22,61 @@ def get_embedding_model():
     )
 
 
+# Helper function to retry embedding in case of ReadTimeout or API rate limit
+def embed_with_retry(embedding_model, text_chunk, max_retries=3, backoff_factor=2):
+    retries = 0
+    while retries < max_retries:
+        try:
+            # Generate the embedding
+            embedding = embedding_model(input=text_chunk)
+            return embedding
+
+        except ReadTimeout as e:
+            logging.warning(
+                f"ReadTimeout error occurred: {e}. Retrying... ({retries+1}/{max_retries})"
+            )
+            retries += 1
+            time.sleep(backoff_factor**retries)  # Exponential backoff
+
+        except HTTPError as e:
+            # Handle API rate limit (status code 429)
+            if e.response.status_code == 429:
+                retry_after = int(e.response.headers.get("Retry-After", 60))
+                logging.warning(
+                    f"API rate limit hit. Retrying after {retry_after} seconds..."
+                )
+                time.sleep(retry_after)
+                retries += 1
+            else:
+                raise e  # For other HTTP errors, re-raise the exception
+
+    # If maximum retries reached
+    raise Exception(f"Failed to embed text chunk after {max_retries} attempts.")
+
+
+# Embed text chunks with retry logic
 def embed_text_chunks(pages_and_chunks: list[dict]) -> pd.DataFrame:
     embedding_model = get_embedding_model()
 
     for item in pages_and_chunks:
-        # Generate the embedding for the sentence chunk
-        embedding = embedding_model(input=item["sentence_chunk"])
+        try:
+            # Retry embedding in case of ReadTimeout or API rate limit error
+            embedding = embed_with_retry(embedding_model, item["sentence_chunk"])
 
-        # If embedding is a nested list, flatten it
-        if isinstance(embedding, list):
-            # Flatten the nested list
-            embedding = [float(val) for sublist in embedding for val in sublist]
-        else:
-            raise ValueError(f"Unexpected embedding format: {type(embedding)}")
+            # If embedding is a nested list, flatten it
+            if isinstance(embedding, list):
+                embedding = [float(val) for sublist in embedding for val in sublist]
+            else:
+                raise ValueError(f"Unexpected embedding format: {type(embedding)}")
 
-        # Store the embedding back in the dictionary
-        item["embedding"] = embedding
+            # Store the embedding back in the dictionary
+            item["embedding"] = embedding
+
+        except Exception as e:
+            logging.error(
+                f"Failed to embed chunk: {item['sentence_chunk']}. Error: {e}"
+            )
+            item["embedding"] = None  # Optionally handle failed embeddings
 
     # Convert the processed data to a DataFrame
     df = pd.DataFrame(pages_and_chunks)
