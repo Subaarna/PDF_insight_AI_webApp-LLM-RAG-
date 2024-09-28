@@ -2,7 +2,7 @@ import os
 import chromadb
 from groq import Groq
 from dotenv import load_dotenv
-from chroma_setup import initialize_client  # Adjust the import to your module name
+from chroma_setup import initialize_client 
 from embedding import query_chroma_db
 
 # Load environment variables from the .env file
